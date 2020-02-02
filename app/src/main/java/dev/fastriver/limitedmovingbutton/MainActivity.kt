@@ -13,62 +13,99 @@ import kotlin.math.atan
 
 class MainActivity : AppCompatActivity() {
 
-    private var touchGapX: Float = 0f
-    private var touchGapY: Float = 0f
+    private lateinit var buttonGestureDetector: GestureDetector
 
-    private var startRawX: Float = 0f
+    private var directionFlag: Boolean = true
+
+    private var touchGapY: Float = 0f
     private var startRawY: Float = 0f
+
+    private var originAnimation: SpringAnimation? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val buttonGestureListener = object: GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent?,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                println("速度: Y=$velocityY")
+                if(directionFlag && velocityY > 500){
+                    originAnimation?.cancel()
+                    println("2low")
+                    move(500f)
+
+                    directionFlag = !directionFlag
+                }
+                else if(!directionFlag && velocityY < -500) {
+                    originAnimation?.cancel()
+                    println("2high")
+                    move(-500f)
+
+                    directionFlag = !directionFlag
+                }
+
+                return super.onFling(e1, e2, velocityX, velocityY)
+            }
+        }
+
+        buttonGestureDetector = GestureDetector(this, buttonGestureListener)
+
         limitedButton.setOnTouchListener { _, e ->
             when(e?.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    touchGapX = e.rawX - limitedButton.x
-                    startRawX = e.rawX
-
                     touchGapY = e.rawY - limitedButton.y
                     startRawY = e.rawY
                 }
 
                 MotionEvent.ACTION_MOVE -> {
-                    limitedButton.x = startRawX - touchGapX - limiter(startRawX - e.rawX, 100f, 0.002f)
-                    limitedButton.y = startRawY - touchGapY - limiter(startRawY - e.rawY, 100f, 0.002f)
+                    val direction = e.rawY - startRawY > 0 == directionFlag
+                    if(direction) {
+                        limitedButton.y = e.rawY - touchGapY
+                    }
+                    else {
+                        limitedButton.y = startRawY - touchGapY - limiter(startRawY - e.rawY, 100f, 0.002f)
+                    }
                 }
 
                 MotionEvent.ACTION_UP -> {
-                    goBack2MyRoots(startRawX - touchGapX, startRawY - touchGapY)
+                    goBack2MyRoots(startRawY - touchGapY)
                 }
             }
 
-            true
+            buttonGestureDetector.onTouchEvent(e)
         }
     }
 
-    fun goBack2MyRoots(rootX: Float, rootY: Float) {
-        val originAnimationX = limitedButton?.let {
-            SpringAnimation(it, DynamicAnimation.X, rootX)
-        }
-        val originAnimationY = limitedButton?.let {
-            SpringAnimation(it, DynamicAnimation.Y, rootY)
+    private fun goBack2MyRoots(root: Float) {
+        originAnimation = limitedButton?.let {
+            SpringAnimation(it, DynamicAnimation.Y, root)
         }
 
-        originAnimationX?.run {
-            spring.stiffness = SpringForce.STIFFNESS_MEDIUM
-            spring.dampingRatio = SpringForce.DAMPING_RATIO_HIGH_BOUNCY
+        originAnimation?.run {
+            spring.stiffness = SpringForce.STIFFNESS_LOW
+            spring.dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
         }
 
-        originAnimationY?.run {
-            spring.stiffness = SpringForce.STIFFNESS_MEDIUM
-            spring.dampingRatio = SpringForce.DAMPING_RATIO_HIGH_BOUNCY
-        }
-
-        originAnimationX?.start()
-        originAnimationY?.start()
+        originAnimation?.start()
     }
 
+    private fun move(distance: Float) {
+        val moveAnimation = limitedButton?.let {
+            SpringAnimation(it, DynamicAnimation.TRANSLATION_Y, distance)
+        }
+
+        moveAnimation?.run {
+            spring.stiffness = SpringForce.STIFFNESS_LOW
+            spring.dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+        }
+
+        moveAnimation?.start()
+    }
 }
 
 fun limiter(input: Float, limit: Float, variation: Float): Float {
