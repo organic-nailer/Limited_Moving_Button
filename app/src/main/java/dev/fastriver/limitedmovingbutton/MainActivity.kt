@@ -13,7 +13,10 @@ import kotlin.math.atan
 
 class MainActivity : AppCompatActivity() {
 
+    private var touchGapX: Float = 0f
     private var touchGapY: Float = 0f
+
+    private var startRawX: Float = 0f
     private var startRawY: Float = 0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,17 +26,20 @@ class MainActivity : AppCompatActivity() {
         limitedButton.setOnTouchListener { _, e ->
             when(e?.action) {
                 MotionEvent.ACTION_DOWN -> {
+                    touchGapX = e.rawX - limitedButton.x
+                    startRawX = e.rawX
+
                     touchGapY = e.rawY - limitedButton.y
                     startRawY = e.rawY
                 }
 
                 MotionEvent.ACTION_MOVE -> {
-                    //limitedButton.y = e.rawY - touchGapY
+                    limitedButton.x = startRawX - touchGapX - limiter(startRawX - e.rawX, 100f, 0.002f)
                     limitedButton.y = startRawY - touchGapY - limiter(startRawY - e.rawY, 100f, 0.002f)
                 }
 
                 MotionEvent.ACTION_UP -> {
-                    goBack2MyRoots(startRawY - touchGapY)
+                    goBack2MyRoots(startRawX - touchGapX, startRawY - touchGapY)
                 }
             }
 
@@ -41,17 +47,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun goBack2MyRoots(root: Float) {
-        val originAnimation = limitedButton?.let {
-            SpringAnimation(it, DynamicAnimation.Y, root)
+    fun goBack2MyRoots(rootX: Float, rootY: Float) {
+        val originAnimationX = limitedButton?.let {
+            SpringAnimation(it, DynamicAnimation.X, rootX)
+        }
+        val originAnimationY = limitedButton?.let {
+            SpringAnimation(it, DynamicAnimation.Y, rootY)
         }
 
-        originAnimation?.run {
+        originAnimationX?.run {
             spring.stiffness = SpringForce.STIFFNESS_MEDIUM
             spring.dampingRatio = SpringForce.DAMPING_RATIO_HIGH_BOUNCY
         }
 
-        originAnimation?.start()
+        originAnimationY?.run {
+            spring.stiffness = SpringForce.STIFFNESS_MEDIUM
+            spring.dampingRatio = SpringForce.DAMPING_RATIO_HIGH_BOUNCY
+        }
+
+        originAnimationX?.start()
+        originAnimationY?.start()
     }
 
 }
