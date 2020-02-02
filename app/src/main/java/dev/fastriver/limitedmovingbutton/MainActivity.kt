@@ -2,20 +2,20 @@ package dev.fastriver.limitedmovingbutton
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.MotionEvent
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.*
 import kotlin.math.PI
 import kotlin.math.atan
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var buttonGestureDetector: GestureDetector
-
-    private var directionFlag: Boolean = true
 
     private var touchGapY: Float = 0f
     private var startRawY: Float = 0f
@@ -34,19 +34,9 @@ class MainActivity : AppCompatActivity() {
                 velocityY: Float
             ): Boolean {
                 println("速度: Y=$velocityY")
-                if(directionFlag && velocityY > 500){
+                if(velocityY > 500){
                     originAnimation?.cancel()
-                    println("2low")
-                    move(500f)
-
-                    directionFlag = !directionFlag
-                }
-                else if(!directionFlag && velocityY < -500) {
-                    originAnimation?.cancel()
-                    println("2high")
-                    move(-500f)
-
-                    directionFlag = !directionFlag
+                    hideByFlick()
                 }
 
                 return super.onFling(e1, e2, velocityX, velocityY)
@@ -63,7 +53,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 MotionEvent.ACTION_MOVE -> {
-                    val direction = e.rawY - startRawY > 0 == directionFlag
+                    val direction = e.rawY - startRawY > 0
                     if(direction) {
                         limitedButton.y = e.rawY - touchGapY
                     }
@@ -79,6 +69,8 @@ class MainActivity : AppCompatActivity() {
 
             buttonGestureDetector.onTouchEvent(e)
         }
+
+        showWithDelay()
     }
 
     private fun goBack2MyRoots(root: Float) {
@@ -94,9 +86,13 @@ class MainActivity : AppCompatActivity() {
         originAnimation?.start()
     }
 
-    private fun move(distance: Float) {
+    private fun hideByFlick() {
+
+        val viewHeight = limitedButton?.height ?: 0
+        val buttonMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16f+16f, resources.displayMetrics)
+
         val moveAnimation = limitedButton?.let {
-            SpringAnimation(it, DynamicAnimation.TRANSLATION_Y, distance)
+            SpringAnimation(it, DynamicAnimation.Y, startRawY + viewHeight + buttonMargin)
         }
 
         moveAnimation?.run {
@@ -105,6 +101,33 @@ class MainActivity : AppCompatActivity() {
         }
 
         moveAnimation?.start()
+
+        GlobalScope.launch {
+            delay(3000)
+
+            showWithDelay()
+        }
+    }
+
+    private fun showWithDelay() {
+        GlobalScope.launch {
+            delay(1000)
+
+            val viewHeight = limitedButton?.height ?: 0
+            val buttonMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16f+16f, resources.displayMetrics)
+
+            val moveAnimation = limitedButton?.let {
+                SpringAnimation(it, DynamicAnimation.TRANSLATION_Y,  -viewHeight -buttonMargin)
+            }
+
+            moveAnimation?.run {
+                spring.stiffness = SpringForce.STIFFNESS_LOW
+                spring.dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+            }
+            withContext(Dispatchers.Main) {
+                moveAnimation?.start()
+            }
+        }
     }
 }
 
